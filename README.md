@@ -1,95 +1,174 @@
-# Reproduction of FAST '04 Paper: CAR (Clock with Adaptive Replacement)
+# Fast-CAR: Cache Replacement Policy Simulator
 
-This repository contains a complete, verified implementation and experimental reproduction of the research paper:
+This project reproduces and extends the FAST '04 **CAR (Clock with Adaptive
+Replacement)** work with a Python cache simulator. It includes classic
+baselines, CAR/CART, and implementations of **S3-FIFO** and **Clock2Q+**.
+Experiments compare hit and miss ratios for synthetic Zipfian, scan-polluted,
+and correlated-page workloads.
 
-> **"CAR: Clock with Adaptive Replacement"**  
-> *Sorav Bansal (Stanford University) & Dharmendra S. Modha (IBM Almaden Research Center)*  
-> Published in: *Proceedings of the 3rd USENIX Conference on File and Storage Technologies (FAST '04)*  
-> Paper File: [`Fast - CAR.pdf`](./Fast%20-%20CAR.pdf)
+The Clock2Q+ implementation is based on:
 
----
+> Yiyan Zhai et al., “Clock2Q+: A Simple and Efficient Replacement Algorithm
+> for Metadata Cache in VMware vSAN,” PVLDB 19(12), 2026.
+> [Paper DOI](https://doi.org/10.14778/3827998.3828002)
 
-## 1. Overview & Key Insights
+The repository also includes the original CAR paper, [`Fast - CAR.pdf`](./Fast%20-%20CAR.pdf).
+The supplied Clock2Q+ PDF may be available locally as `3827998.3828002.pdf`;
+the DOI above is the stable paper reference.
 
-Traditional caching algorithms face a fundamental tradeoff between **replacement quality** and **concurrency overhead**:
-* **LRU & ARC** achieve high hit ratios by tracking recency and frequency, but require moving accessed pages to the MRU position on **every single cache hit**. In multi-threaded environments (OS virtual memory, database buffer pools, storage controllers), this serializes all hits behind a global mutex lock (Drawbacks **D1** and **D2**).
-* **CLOCK (Second Chance)** eliminates hit serialization by using a 1-bit reference flag and a circular clock hand. Hits only set `bit = 1` without pointer moves. However, CLOCK cannot distinguish frequency and is heavily degraded by sequential scans (Drawbacks **D3** and **D4**).
+## 1. Clone the project
 
-### The Solution: CAR & CART
-* **CAR (Clock with Adaptive Replacement):** Replaces ARC's LRU lists with two Second Chance clock queues ($T_1$ for recency, $T_2$ for frequency) and two ghost history queues ($B_1$ and $B_2$). Hits only set the reference bit to 1 ($O(1)$, lock-friendly). Page promotions to $T_2$ are delayed until eviction time. The target size $p$ continuously self-tunes based on workload feedback.
-* **CART (CAR with Temporal Filtering):** Introduces a temporal locality window and filter bits (`S` and `L`) to filter out bursty "correlated references".
+Install Git and Python 3.10 or later, then clone the repository:
 
----
-
-## 2. Codebase Structure
-
-```
-OS project/
-├── Fast - CAR.pdf                     # Original FAST '04 paper
-├── README.md                          # Project documentation and reproduction guide
-├── cache_simulator/                   # Core caching engine package
-│   ├── __init__.py                    # Module exports
-│   ├── base.py                        # Base CachePolicy interface and metrics tracking
-│   ├── lru.py                         # Classical LRU implementation
-│   ├── clock.py                       # Classic 1-bit CLOCK (Second Chance) implementation
-│   ├── arc.py                         # ARC (FAST '03) implementation
-│   ├── car.py                         # CAR (FAST '04, Figure 2) implementation
-│   ├── cart.py                        # CART (FAST '04, Figure 3) implementation
-│   └── workloads.py                   # Trace parsers & Zipfian, Scan, Correlated generators
-├── tests/
-│   └── test_algorithms.py             # Unit tests verifying invariants (I1-I7) & scan resistance
-├── run_simulation.py                  # Replicates Tables II & III and Figures 4 & 5
-├── run_adaptation_analysis.py         # Replicates Figure 6 (Tracking target p over virtual time)
-├── run_concurrency_benchmark.py       # Replicates D1/D2 benchmark (Throughput vs Lock Contention)
-└── results/                           # Generated publication plots
-    ├── hit_ratio_comparison.png       # Hit ratios across cache sizes and workloads
-    ├── adaptation_parameter_p.png     # Figure 6 target size p trajectory
-    └── concurrency_throughput.png     # Multi-threaded throughput scaling curve
-```
-
----
-
-## 3. How to Run
-
-### Run Unit Tests
-Verifies correct eviction logic, cache capacity bounds, and paper invariants:
 ```bash
-python -m unittest tests/test_algorithms.py
+git clone https://github.com/pranav-illendula/Fast-CAR.git
+cd Fast-CAR
 ```
 
-### Run Hit-Ratio Comparative Simulation (Replicating Tables II & III, Figures 4 & 5)
-Evaluates `LRU`, `CLOCK`, `ARC`, `CAR`, and `CART` across a range of cache sizes:
+Run all commands below from the repository root (the directory containing
+`run_simulation.py`).
+
+## 2. Set up Python
+
+Create and activate a virtual environment, then install the packages used by
+the workload generators and plots.
+
+### Windows PowerShell
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install numpy matplotlib
+```
+
+If PowerShell prevents environment activation, run commands using the virtual
+environment's interpreter directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install numpy matplotlib
+.\.venv\Scripts\python.exe run_simulation.py
+```
+
+### macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install numpy matplotlib
+```
+
+## 3. Project layout and implementation files
+
+```text
+cache_simulator/
+  base.py       Shared cache interface, hit/miss counters, and statistics
+  lru.py        Least Recently Used baseline
+  clock.py      Second-Chance CLOCK baseline
+  arc.py        Adaptive Replacement Cache baseline
+  car.py        CAR policy
+  cart.py       CART policy with temporal filtering
+  s3fifo.py     S3-FIFO comparison baseline
+  clock2q.py    Clock2Q+ research-policy implementation
+  workloads.py  Synthetic workload generators and trace-file reader
+tests/
+  test_algorithms.py  Policy behavior and invariant tests
+run_simulation.py             Runs policy comparisons and generates a plot
+run_adaptation_analysis.py    Plots CAR's adaptive target p over time
+run_concurrency_benchmark.py  Compares the LRU/CAR threaded benchmark
+results/                      Generated PNG figures
+```
+
+### Which Python files should I implement or modify?
+
+If extending the research implementation, work primarily in these files:
+
+1. **`cache_simulator/clock2q.py`** — implement or refine Clock2Q+: the Small
+   FIFO, Main Clock, Ghost FIFO, and correlation-window behavior.
+2. **`cache_simulator/s3fifo.py`** — implement or refine the S3-FIFO baseline
+   used to compare against Clock2Q+.
+3. **`cache_simulator/workloads.py`** — define the request traces to test,
+   including the grouped, correlated-page bursts.
+4. **`tests/test_algorithms.py`** — add correctness tests: expected promotions
+   and evictions, ghost re-admission, queue bounds, capacity limits, and
+   disjoint resident/ghost pages.
+5. **`cache_simulator/__init__.py`** — export any new policy so it can be
+   imported by the runner and other scripts.
+6. **`run_simulation.py`** — include the policy in each comparison and decide
+   which workloads and cache capacities to evaluate.
+
+Existing policies and `cache_simulator/base.py` provide the interface to
+follow: each policy implements `access(page_id)` and returns `True` on a hit
+and `False` on a miss. Use `CachePolicy` for request, hit, and miss accounting.
+Keep a new policy in its own module rather than mixing it into CAR or CART.
+
+## 4. Run tests and experiments
+
+### Unit tests
+
+```bash
+python -m unittest tests.test_algorithms -v
+```
+
+The suite checks the original policies and Clock2Q+/S3-FIFO behavior, including
+cache-capacity and queue invariants over multiple cache sizes.
+
+### Main policy comparison
+
 ```bash
 python run_simulation.py
 ```
 
-### Run Adaptation Analysis (Replicating Figure 6)
-Tracks the dynamic adjustment of the target parameter $p(t)$:
+The runner evaluates **LRU, CLOCK, ARC, CAR, CART, S3-FIFO, and Clock2Q+** on:
+
+- **Zipfian:** skewed access frequencies.
+- **Scan-polluted:** a repeatedly accessed working set interrupted by one-time
+  sequential scans.
+- **Correlated references:** bursts visit multiple page IDs from the same
+  configurable group, and may repeat each page within the burst.
+
+The console reports `hit/miss (%)` for each policy and cache capacity. Hit and
+miss ratios should sum to approximately 100%. The workload generators use
+fixed seeds by default so runs are repeatable.
+
+### Optional CAR experiments
+
 ```bash
 python run_adaptation_analysis.py
-```
-
-### Run Concurrency & Lock Contention Benchmark
-Demonstrates the throughput advantage of CAR (lock-free hit path) over LRU (serialized hit lock):
-```bash
 python run_concurrency_benchmark.py
 ```
 
----
+The first script plots CAR's adaptive target `p`; the second measures the
+repository's threaded LRU/CAR benchmark. Treat the concurrency measurements as
+a Python simulator demonstration, not as production-system performance data.
 
-## 4. Key Experimental Findings
+## 5. Results
 
-### A. Hit Ratio & Scan Resistance (Tables II & III)
-| Workload | Cache Size | LRU (%) | CLOCK (%) | ARC (%) | CAR (Paper) (%) | CART (Paper) (%) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Zipfian (Database/Storage)** | 32 | 95.99% | 96.20% | 96.58% | **96.71%** | **96.76%** |
-| | 64 | 97.77% | 97.86% | 98.08% | **98.14%** | **98.13%** |
-| **Scan Vulnerability** | 128 | 34.11% | 34.11% | **44.56%** | **44.56%** | **44.56%** |
-| | 256 | 34.11% | 34.11% | **44.63%** | **44.63%** | **44.63%** |
-| | 512 | 34.11% | 40.34% | **44.63%** | **44.63%** | **44.63%** |
+`run_simulation.py` writes `results/hit_ratio_comparison.png` and prints the
+numeric measurements. The other scripts write
+`results/adaptation_parameter_p.png` and
+`results/concurrency_throughput.png`, respectively. These output files can be
+regenerated using the commands above.
 
-* **Scan Resistance:** When one-time sequential scan pages pollute the cache, basic LRU and CLOCK hit ratios collapse to 34.11%, while **CAR and ARC achieve 44.63%** (a ~10.5% absolute improvement) by shielding high-frequency pages in $T_2$.
-* **Parity with ARC:** In every benchmark, $\text{HitRatio}(\text{CAR}) \approx \text{HitRatio}(\text{ARC})$, matching the theoretical and empirical claims of the paper.
+Example measurements from the included **synthetic** workloads:
 
-### B. Concurrency Throughput Scaling (D1 & D2)
-* Under a 90%+ hit-rate skewed workload, **CAR achieves over 2x to 2.4x higher throughput than LRU** because hits do not require exclusive lock acquisition.
+| Workload | Capacity | S3-FIFO hit rate | Clock2Q+ hit rate |
+|---|---:|---:|---:|
+| Zipfian | 32 | 96.84% | 96.78% |
+| Scan-polluted | 128 | 43.62% | 43.10% |
+| Correlated references | 512 | 72.63% | 71.75% |
+
+These are results from this project's generated traces, not numbers reported
+by the Clock2Q+ paper. Results depend on workload shape, seed, and capacity;
+compare all policies on the same generated request stream before drawing
+conclusions.
+
+## 6. Scope and limitations
+
+The simulator implements Clock2Q+'s core replacement behavior and compares it
+with S3-FIFO and the existing policies. It does not reproduce VMware vSAN's
+production implementation, real metadata traces, dirty-page-aware eviction,
+fine-grained synchronization, or online cache resizing. Synthetic benchmark
+results should not be presented as reproductions of the paper's measured
+production or trace-based results.

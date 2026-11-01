@@ -52,22 +52,41 @@ def correlated_workload(
     num_pages: int = 1000,
     burst_length: int = 4,
     burst_prob: float = 0.4,
-    seed: int = 42
+    seed: int = 42,
+    correlation_group_size: int = 8,
 ) -> List[int]:
     """
-    Generates accesses with rapid temporal bursts to the same page
-    ("correlated references"), testing CART's temporal filtering advantage over CAR.
+    Generate bursts that touch several related pages, with repeated references
+    to each page in a burst. Consecutive page-ID groups model co-resident
+    metadata pages accessed together.
     """
+    if num_requests < 0:
+        raise ValueError("num_requests must be non-negative")
+    if num_pages < 2:
+        raise ValueError("num_pages must be at least 2")
+    if burst_length < 2:
+        raise ValueError("burst_length must be at least 2")
+    if not 0.0 <= burst_prob <= 1.0:
+        raise ValueError("burst_prob must be between 0 and 1")
+    if correlation_group_size < 2:
+        raise ValueError("correlation_group_size must be at least 2")
+
     rng = random.Random(seed)
     stream: List[int] = []
+    groups = [
+        list(range(start, min(start + correlation_group_size, num_pages + 1)))
+        for start in range(1, num_pages + 1, correlation_group_size)
+    ]
+    groups = [group for group in groups if len(group) >= 2]
+
     while len(stream) < num_requests:
-        page = rng.randint(1, num_pages)
         if rng.random() < burst_prob:
-            # Bursty consecutive references
-            burst = rng.randint(2, burst_length)
-            stream.extend([page] * burst)
+            group = rng.choice(groups)
+            page_count = rng.randint(2, min(burst_length, len(group)))
+            for page in rng.sample(group, page_count):
+                stream.extend([page] * rng.randint(2, burst_length))
         else:
-            stream.append(page)
+            stream.append(rng.randint(1, num_pages))
     return stream[:num_requests]
 
 

@@ -1,11 +1,16 @@
-"""
-Comparative simulation runner replicating Table II, Table III, and Figures 4 & 5
-from FAST '04 CAR paper.
-"""
+"""Compare classic, adaptive, and FIFO cache-replacement policies."""
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-from cache_simulator import LRUCache, ClockCache, ARCCache, CARCache, CARTCache
+from cache_simulator import (
+    LRUCache,
+    ClockCache,
+    ARCCache,
+    CARCache,
+    CARTCache,
+    Clock2QCache,
+    S3FIFOCache,
+)
 from cache_simulator.workloads import (
     zipfian_workload,
     scan_workload,
@@ -18,17 +23,13 @@ def run_benchmark(workload_name: str, requests: list, cache_sizes: list):
     print(f"\n========================================================")
     print(f" Workload: {workload_name} ({len(requests)} requests, {len(set(requests))} unique pages)")
     print(f"========================================================")
-    print(f"{'Cache Size':<12} | {'LRU (%)':<10} | {'CLOCK (%)':<10} | {'ARC (%)':<10} | {'CAR (%)':<10} | {'CART (%)':<10}")
-    print("-" * 72)
-
-    results = {
-        "cache_sizes": cache_sizes,
-        "LRU": [],
-        "CLOCK": [],
-        "ARC": [],
-        "CAR": [],
-        "CART": []
-    }
+    results = {"cache_sizes": cache_sizes}
+    policy_names = ["LRU", "CLOCK", "ARC", "CAR", "CART", "S3-FIFO", "Clock2Q+"]
+    print(
+        f"{'Cache Size':<12} | "
+        + " | ".join(f"{name} hit/miss (%)" for name in policy_names)
+    )
+    print("-" * (16 + 23 * len(policy_names)))
 
     for c in cache_sizes:
         algorithms = [
@@ -36,16 +37,20 @@ def run_benchmark(workload_name: str, requests: list, cache_sizes: list):
             ClockCache(c),
             ARCCache(c),
             CARCache(c),
-            CARTCache(c)
+            CARTCache(c),
+            S3FIFOCache(c),
+            Clock2QCache(c),
         ]
 
         row = [f"{c:<12}"]
         for algo in algorithms:
             for page in requests:
                 algo.access(page)
-            hr = algo.hit_ratio
-            results[algo.name].append(hr)
-            row.append(f"{hr:>8.2f}%")
+            hit_ratio = algo.hit_ratio
+            miss_ratio = algo.miss_ratio
+            results.setdefault(algo.name, []).append(hit_ratio)
+            results.setdefault(f"{algo.name}_miss", []).append(miss_ratio)
+            row.append(f"{hit_ratio:5.2f}/{miss_ratio:5.2f}")
 
         print(" | ".join(row))
 
@@ -61,11 +66,25 @@ def plot_results(all_results: dict, output_dir: str = "results"):
         ax = axes[0][idx]
         sizes = data["cache_sizes"]
         
-        ax.plot(sizes, data["LRU"], label="LRU", marker="o", linestyle="--", color="#d62728")
-        ax.plot(sizes, data["CLOCK"], label="CLOCK", marker="s", linestyle=":", color="#ff7f0e")
-        ax.plot(sizes, data["ARC"], label="ARC", marker="^", linestyle="-.", color="#2ca02c")
-        ax.plot(sizes, data["CAR"], label="CAR (Paper)", marker="D", linewidth=2.5, color="#1f77b4")
-        ax.plot(sizes, data["CART"], label="CART (Paper)", marker="*", linewidth=2.0, color="#9467bd")
+        policies = [
+            ("LRU", "o", "--", "#d62728"),
+            ("CLOCK", "s", ":", "#ff7f0e"),
+            ("ARC", "^", "-.", "#2ca02c"),
+            ("CAR", "D", "-", "#1f77b4"),
+            ("CART", "*", "-", "#9467bd"),
+            ("S3-FIFO", "v", "--", "#8c564b"),
+            ("Clock2Q+", "P", "-", "#17becf"),
+        ]
+        for name, marker, linestyle, color in policies:
+            ax.plot(
+                sizes,
+                data[name],
+                label=name,
+                marker=marker,
+                linestyle=linestyle,
+                linewidth=2.2 if name in ("CAR", "Clock2Q+") else 1.6,
+                color=color,
+            )
 
         ax.set_title(f"Workload: {wname}", fontsize=12, fontweight="bold")
         ax.set_xlabel("Cache Size (pages)", fontsize=10)
@@ -92,8 +111,14 @@ def main():
     scan_reqs = scan_workload(working_set_size=128, scan_size=600, cycles=15, seed=456)
     scan_sizes = [32, 64, 128, 256, 512]
 
-    # 3. Correlated references workload (Bursty clustered requests)
-    corr_reqs = correlated_workload(num_requests=30000, num_pages=2000, burst_length=5, seed=789)
+    # 3. Correlated metadata workload (bursts span multiple related pages)
+    corr_reqs = correlated_workload(
+        num_requests=30000,
+        num_pages=2000,
+        burst_length=5,
+        correlation_group_size=8,
+        seed=789,
+    )
     corr_sizes = [32, 64, 128, 256, 512]
 
     all_results = {}
