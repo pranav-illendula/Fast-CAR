@@ -74,8 +74,11 @@ Fast-CAR/
 │   ├── s3fifo.py                  S3-FIFO comparison policy
 │   ├── clock2q.py                 Clock2Q+ research policy
 │   └── workloads.py               Synthetic workloads and text trace reader
+├── dashboard_simulation.py        Replay, trace parsing, and comparison helpers
+├── streamlit_app.py                Interactive policy and workload dashboard
 ├── tests/
-│   └── test_algorithms.py         Policy behavior and invariant tests
+│   ├── test_algorithms.py          Policy behavior and invariant tests
+│   └── test_dashboard_simulation.py Dashboard helper and trace tests
 ├── results/                       Output folder for generated plots
 │   ├── hit_ratio_comparison.png   Hit-ratio comparison from the main runner
 │   ├── adaptation_parameter_p.png CAR adaptive target p over virtual time
@@ -156,6 +159,31 @@ python run_concurrency_benchmark.py
 The first script plots CAR's adaptive target `p`; the second measures the
 repository's threaded LRU/CAR benchmark. Treat the concurrency measurements as
 a Python simulator demonstration, not as production-system performance data.
+
+### Interactive Streamlit dashboard
+
+Run the dashboard from the repository root:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+The **Cache Policy Playground** provides:
+
+- Step-by-step replay of a selected policy, including queue contents, reference
+  bits, ghost entries, adaptive targets, and evictions.
+- Side-by-side hit-rate comparisons and cumulative hit-rate curves for all
+  seven policies on the same generated or uploaded trace.
+- Workload controls for Zipfian, scan-polluted, correlated, and cyclic traces,
+  plus an optional text/CSV trace upload and trace download.
+- A paper guide that explains each research mechanism and links to the cited
+  work.
+
+The dashboard's results are measurements of this repository's simulator.
+Synthetic correlated page groups are not production metadata traces, and the
+dashboard does not model storage latency, dirty pages, metadata bytes, or
+concurrent-system performance. Do not treat its measurements as reproductions
+of results reported in the cited papers.
 
 ## 5. Results
 
