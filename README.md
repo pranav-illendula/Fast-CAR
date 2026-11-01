@@ -39,14 +39,14 @@ the workload generators and plots.
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install numpy matplotlib
+python -m pip install -r requirements.txt
 ```
 
 If PowerShell prevents environment activation, run commands using the virtual
 environment's interpreter directly:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install numpy matplotlib
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe run_simulation.py
 ```
 
@@ -56,29 +56,43 @@ environment's interpreter directly:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install numpy matplotlib
+python -m pip install -r requirements.txt
 ```
 
-## 3. Project layout and implementation files
+## 3. Project files and what they do
 
 ```text
-cache_simulator/
-  base.py       Shared cache interface, hit/miss counters, and statistics
-  lru.py        Least Recently Used baseline
-  clock.py      Second-Chance CLOCK baseline
-  arc.py        Adaptive Replacement Cache baseline
-  car.py        CAR policy
-  cart.py       CART policy with temporal filtering
-  s3fifo.py     S3-FIFO comparison baseline
-  clock2q.py    Clock2Q+ research-policy implementation
-  workloads.py  Synthetic workload generators and trace-file reader
-tests/
-  test_algorithms.py  Policy behavior and invariant tests
-run_simulation.py             Runs policy comparisons and generates a plot
-run_adaptation_analysis.py    Plots CAR's adaptive target p over time
-run_concurrency_benchmark.py  Compares the LRU/CAR threaded benchmark
-results/                      Generated PNG figures
+Fast-CAR/
+├── cache_simulator/               Cache policies and workload generators
+│   ├── __init__.py                Public package imports and policy exports
+│   ├── base.py                    Shared policy interface and hit/miss statistics
+│   ├── lru.py                     Least Recently Used baseline
+│   ├── clock.py                   Second-Chance CLOCK baseline
+│   ├── arc.py                     Adaptive Replacement Cache baseline
+│   ├── car.py                     CAR policy and adaptive target p telemetry
+│   ├── cart.py                    CART policy with temporal filtering
+│   ├── s3fifo.py                  S3-FIFO comparison policy
+│   ├── clock2q.py                 Clock2Q+ research policy
+│   └── workloads.py               Synthetic workloads and text trace reader
+├── tests/
+│   └── test_algorithms.py         Policy behavior and invariant tests
+├── results/                       Output folder for generated plots
+│   ├── hit_ratio_comparison.png   Hit-ratio comparison from the main runner
+│   ├── adaptation_parameter_p.png CAR adaptive target p over virtual time
+│   └── concurrency_throughput.png Threaded LRU/CAR throughput comparison
+├── run_simulation.py              Runs all policy/workload comparisons
+├── run_adaptation_analysis.py      Runs CAR adaptation experiment
+├── run_concurrency_benchmark.py    Runs threaded LRU/CAR experiment
+├── requirements.txt                External Python package dependencies
+├── .gitignore                      Excludes environments, caches, and build files
+├── README.md                       Setup, usage, and repository guide
+├── PROJECT_TECHNICAL_REPORT.md     Detailed project technical report
+├── Fast - CAR.pdf                  Original FAST '04 CAR paper
+└── 3827998.3828002.pdf             Clock2Q+ PVLDB 2026 paper (if included)
 ```
+
+The `results/` images are generated outputs. Run their corresponding scripts
+to refresh them after changing workloads or policy implementations.
 
 ### Which Python files should I implement or modify?
 
