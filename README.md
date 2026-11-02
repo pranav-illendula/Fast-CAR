@@ -13,6 +13,7 @@ The Clock2Q+ implementation is based on:
 > [Paper DOI](https://doi.org/10.14778/3827998.3828002)
 
 The orginal CAR Research paper is available in web "https://dl.acm.org/doi/proceedings/10.5555/1973374"
+
 The Clock2Q+ Research paper is available in web "https://arxiv.org/abs/2511.21958"
 
 ## 1. Clone the project
