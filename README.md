@@ -1,4 +1,4 @@
-# Fast-CAR: Cache Replacement Policy Simulator
+<img width="4032" height="1879" alt="image" src="https://github.com/user-attachments/assets/feffb9a8-5a2e-4b3a-85d6-a5f36253d99b" /># Fast-CAR: Cache Replacement Policy Simulator
 
 This project reproduces and extends the FAST '04 **CAR (Clock with Adaptive
 Replacement)** work with a Python cache simulator. It includes classic
@@ -12,9 +12,8 @@ The Clock2Q+ implementation is based on:
 > for Metadata Cache in VMware vSAN,” PVLDB 19(12), 2026.
 > [Paper DOI](https://doi.org/10.14778/3827998.3828002)
 
-The repository also includes the original CAR paper, [`Fast - CAR.pdf`](./Fast%20-%20CAR.pdf).
-The supplied Clock2Q+ PDF may be available locally as `3827998.3828002.pdf`;
-the DOI above is the stable paper reference.
+The orginal CAR Research paper is available in web "https://dl.acm.org/doi/proceedings/10.5555/1973374"
+The Clock2Q+ Research paper is available in web "https://arxiv.org/abs/2511.21958"
 
 ## 1. Clone the project
 
