@@ -1,4 +1,4 @@
-<img width="4032" height="1879" alt="image" src="https://github.com/user-attachments/assets/feffb9a8-5a2e-4b3a-85d6-a5f36253d99b" /># Fast-CAR: Cache Replacement Policy Simulator
+Fast-CAR: Cache Replacement Policy Simulator
 
 This project reproduces and extends the FAST '04 **CAR (Clock with Adaptive
 Replacement)** work with a Python cache simulator. It includes classic
